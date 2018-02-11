@@ -15,7 +15,8 @@ my %gets = (
 
 my %sets = (
     "cmd" => "",
-    "Power" => ":on,off,toggle",
+    "on" => ":noArg",
+    "off" => ":noArg",
     "Upgrade" => ":1",
     "Status" => ":noArg",
     "OtaUrl" => ""
@@ -76,6 +77,7 @@ use GPUtils qw(:all);
 use JSON;
 
 use Net::MQTT::Constants;
+use SetExtensions qw/ :all /;
 
 BEGIN {
     MQTT->import(qw(:all));
@@ -88,6 +90,8 @@ BEGIN {
         readingsBeginUpdate
         readingsEndUpdate
         Log3
+        SetExtensions
+        SetExtensionsCancel
         fhem
         defs
         AttrVal
@@ -167,6 +171,11 @@ sub Set($$$@) {
         return "Unknown argument " . $command . ", choose one of " . join(" ", map { "$_$sets{$_}" } keys %sets) . " " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}});
     }
     
+    if ($command =~ m/^(blink|intervals|(off-|on-)(for-timer|till)|toggle)/) {
+        Log3($hash->{NAME},5,"calling SetExtensions(...) for $command");
+        return SetExtensions($hash, join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}}), $name, $command, @values);
+    }
+    
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
 
     if (defined($sets{$command})) {
@@ -183,8 +192,16 @@ sub Set($$$@) {
 
             Log3($hash->{NAME}, 5, "sent (cmnd) '" . $value . "' to " . $topic);
         } else {
-            my $topic = TASMOTA::DEVICE::GetTopicFor($hash, "cmnd/" . $command);
-            my $value = join (" ", @values);
+            my $topic;
+            my $value;
+            
+            if ($command =~ m/^on|off$/s) {
+                $topic = TASMOTA::DEVICE::GetTopicFor($hash, "cmnd/Power");
+                $value = $command;
+            } else {        
+                $topic = TASMOTA::DEVICE::GetTopicFor($hash, "cmnd/" . $command);
+                $value = join (" ", @values);
+            }
 
             $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
 
@@ -203,6 +220,7 @@ sub Set($$$@) {
     } else {
         return MQTT::DEVICE::Set($hash, $name, $command, @values);
     }
+    SetExtensionsCancel($hash);
 }
 
 sub onmessage($$$) {
