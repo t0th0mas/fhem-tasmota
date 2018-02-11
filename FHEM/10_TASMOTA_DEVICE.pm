@@ -3,6 +3,7 @@
 # fhem bridge to mqtt (see http://mqtt.org)
 #
 # written 2017 by Matthias Kleine <info at haus-automatisierung.com>
+# modified 2017 by Thomas Toelg
 #
 ##############################################
 
@@ -19,7 +20,8 @@ my %sets = (
     "off" => ":noArg",
     "Upgrade" => ":1",
     "Status" => ":noArg",
-    "OtaUrl" => ""
+    "OtaUrl" => "",
+    "Clear" => ":noArg"
 );
 
 my @topics = qw(
@@ -60,8 +62,7 @@ sub TASMOTA_DEVICE_Initialize($) {
     $hash->{UndefFn} = "TASMOTA::DEVICE::Undefine";
     $hash->{SetFn} = "TASMOTA::DEVICE::Set";
     $hash->{AttrFn} = "MQTT::DEVICE::Attr";
-    #$hash->{AttrList} = "IODev qos retain publishSet publishSet_.* subscribeReading_.* autoSubscribeReadings " . $main::readingFnAttributes;
-    $hash->{AttrList} = "IODev qos retain " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev qos retain publishSet publishSet_.* subscribeReading_.* autoSubscribeReadings " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "TASMOTA::DEVICE::onmessage";
 
     main::LoadModule("MQTT");
@@ -111,7 +112,7 @@ sub Define() {
     if (defined($topic)) {
 
         $hash->{TOPIC} = $topic;
-        $hash->{MODULE_VERSION} = "0.2";
+        $hash->{MODULE_VERSION} = "0.3";
 
         if (defined($fullTopic) && $fullTopic ne "") {
             $topic = quotemeta $topic; # escape regex metachars if present
@@ -168,13 +169,8 @@ sub Undefine($$) {
 sub Set($$$@) {
     my ($hash, $name, $command, @values) = @_;
 
-    if ($command eq '?') {
-        return "Unknown argument " . $command . ", choose one of " . join(" ", map { "$_$sets{$_}" } keys %sets) . " " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}});
-    }
-    
-    if ($command =~ m/^(blink|intervals|(off-|on-)(for-timer|till)|toggle)/) {
-        Log3($hash->{NAME},5,"calling SetExtensions(...) for $command");
-        return SetExtensions($hash, join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}}), $name, $command, @values);
+    if ($command eq '?' || $command =~ m/^(blink|intervals|(off-|on-)(for-timer|till)|toggle)/) {
+        return SetExtensions($hash, join(" ", map { "$_$sets{$_}" } keys %sets) . " " . join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}}), $name, $command, @values);
     }
     
     Log3($hash->{NAME}, 5, "set " . $command . " - value: " . join (" ", @values));
@@ -192,35 +188,36 @@ sub Set($$$@) {
             $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
 
             Log3($hash->{NAME}, 5, "sent (cmnd) '" . $value . "' to " . $topic);
-        } else {
-            my $topic;
+        } elsif ($command eq "Clear") {
+			fhem("deletereading $name .*");
+		} else {
             my $value;
-            
+			my $t;
+			
             if ($command =~ m/^on|off$/s) {
-                $topic = TASMOTA::DEVICE::GetTopicFor($hash, "cmnd/Power");
+				$t = "cmnd/power";
                 $value = $command;
-            } else {        
-                $topic = TASMOTA::DEVICE::GetTopicFor($hash, "cmnd/" . $command);
+            } else {
+				$t = "cmnd/".$command;
                 $value = join (" ", @values);
             }
-
+			
+			my $topic = TASMOTA::DEVICE::GetTopicFor($hash, $t);
             $msgid = send_publish($hash->{IODev}, topic => $topic, message => $value, qos => $qos, retain => $retain);
 
             Log3($hash->{NAME}, 5, "sent '" . $value . "' to " . $topic);
         }
 
-        $hash->{message_ids}->{$msgid}++ if defined $msgid;
+		$hash->{message_ids}->{$msgid}++ if defined $msgid;
 
         # Refresh Status
-
         my $statusTopic = TASMOTA::DEVICE::GetTopicFor($hash, "cmnd/Status");
         $msgid = send_publish($hash->{IODev}, topic => $statusTopic, message => "0", qos => $qos, retain => $retain);
         $hash->{message_ids}->{$msgid}++ if defined $msgid;
 
         Log3($hash->{NAME}, 5, "sent (cmnd) '0' to " . $statusTopic);
     } else {
-        return SetExtensions($hash, join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}}), $name, $command, @values);
-        #return MQTT::DEVICE::Set($hash, $name, $command, @values);
+        return MQTT::DEVICE::Set($hash, $name, $command, @values);
     }
     SetExtensionsCancel($hash);
 }
@@ -335,6 +332,9 @@ sub Expand($$$$) {
     <li>
       <p><code>set &lt;name&gt; &lt;reading&gt; &lt;value&gt;</code><br/>
          sets reading &lt;reading&gt; and publishes the command to topic configured via attr publishSet_&lt;reading&gt;</p>
+    </li>
+    <li>
+      <p>The <a href="#setExtensions">set extensions</a> are supported.</p>
     </li>
   </ul>
   <a name="TASMOTA_DEVICEattr"></a>
