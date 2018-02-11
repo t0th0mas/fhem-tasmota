@@ -5,15 +5,16 @@ This module extends the default MQTT_Device of FHEM, to make the integration of 
 - All topics will be subscribed automatically
 - JSON messages with multiple information are automatically splitted into separate readings
 - You can use set ... cmd syntax to configure your Tasmota device without any knowledge about the mqtt topics
+- SetExtensions (on-for-timer, blink...) are supported out of the box
 
 But: This module is still under development. Please report any issues.
 
 ## Installation
 
 ```
-update add https://raw.githubusercontent.com/klein0r/fhem-tasmota/master/controls_tasmota.txt
-update check tasmota
-update all tasmota
+update add https://raw.githubusercontent.com/t0th0mas/fhem-tasmota/master/controls_tasmotadevice.txt
+update check tasmotadevice
+update all tasmotadevice
 ```
 
 ## License
@@ -21,6 +22,7 @@ update all tasmota
 MIT License
 
 Copyright (c) 2017 Matthias Kleine
+Copyright (c) 2017 Thomas Toelg
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
