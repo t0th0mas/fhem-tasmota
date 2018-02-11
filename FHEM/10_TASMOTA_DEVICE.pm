@@ -245,7 +245,7 @@ sub Decode($$$) {
     my $h;
 
     eval {
-        $h = JSON::decode_json($value);
+        $h = decode_json($value);
         1;
     };
 
