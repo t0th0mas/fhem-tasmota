@@ -60,7 +60,8 @@ sub TASMOTA_DEVICE_Initialize($) {
     $hash->{UndefFn} = "TASMOTA::DEVICE::Undefine";
     $hash->{SetFn} = "TASMOTA::DEVICE::Set";
     $hash->{AttrFn} = "MQTT::DEVICE::Attr";
-    $hash->{AttrList} = "IODev qos retain publishSet publishSet_.* subscribeReading_.* autoSubscribeReadings " . $main::readingFnAttributes;
+    #$hash->{AttrList} = "IODev qos retain publishSet publishSet_.* subscribeReading_.* autoSubscribeReadings " . $main::readingFnAttributes;
+    $hash->{AttrList} = "IODev qos retain " . $main::readingFnAttributes;
     $hash->{OnMessageFn} = "TASMOTA::DEVICE::onmessage";
 
     main::LoadModule("MQTT");
@@ -218,7 +219,8 @@ sub Set($$$@) {
 
         Log3($hash->{NAME}, 5, "sent (cmnd) '0' to " . $statusTopic);
     } else {
-        return MQTT::DEVICE::Set($hash, $name, $command, @values);
+        return SetExtensions($hash, join(" ", map {$hash->{sets}->{$_} eq "" ? $_ : "$_:".$hash->{sets}->{$_}} sort keys %{$hash->{sets}}), $name, $command, @values);
+        #return MQTT::DEVICE::Set($hash, $name, $command, @values);
     }
     SetExtensionsCancel($hash);
 }
