@@ -108,6 +108,7 @@ sub Define() {
         $hash->{MODULE_VERSION} = "0.2";
 
         if (defined($fullTopic) && $fullTopic ne "") {
+            $topic = quotemeta $topic; # escape regex metachars if present
             $fullTopic =~ s/%topic%/$topic/;
             $hash->{FULL_TOPIC} = $fullTopic;
         } else {
@@ -136,7 +137,11 @@ sub GetTopicFor($$) {
     my ($hash, $prefix) = @_;
     
     my $tempTopic = $hash->{FULL_TOPIC};
-    $tempTopic =~ s/%prefix%/$prefix/;
+    my ($prefixSplit, $topic) = (split /\//, $prefix, 2)[0, 1]; # split prefix and topic
+    
+    $prefixSplit = quotemeta $prefixSplit; # escape regex metachars if present
+    $tempTopic =~ s/%prefix%/$prefixSplit/;
+    $tempTopic .= $topic;
 
     return $tempTopic;
 }
@@ -240,7 +245,7 @@ sub Decode($$$) {
     my $h;
 
     eval {
-        $h = JSON::decode_json($value);
+        $h = JSON::XS::decode_json($value);
         1;
     };
 
