@@ -73,6 +73,7 @@ use warnings;
 use POSIX;
 use SetExtensions;
 use GPUtils qw(:all);
+use JSON;
 
 use Net::MQTT::Constants;
 
