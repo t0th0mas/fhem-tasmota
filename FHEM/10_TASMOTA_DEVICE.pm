@@ -115,7 +115,6 @@ sub Define() {
         $hash->{MODULE_VERSION} = "0.3";
 
         if (defined($fullTopic) && $fullTopic ne "") {
-            $topic = quotemeta $topic; # escape regex metachars if present
             $fullTopic =~ s/%topic%/$topic/;
             $hash->{FULL_TOPIC} = $fullTopic;
         } else {
